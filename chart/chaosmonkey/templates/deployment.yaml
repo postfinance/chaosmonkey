@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chaosmonkey.fullname" . }}
+  labels:
+    {{- include "chaosmonkey.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "chaosmonkey.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "chaosmonkey.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.profiles }}
+        checksum/profiles: {{ toYaml .Values.profiles | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "chaosmonkey.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+        - name: chaosmonkey
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- if .Values.profiles }}
+            - --profiles=/config/profiles.yaml
+            {{- end }}
+            {{- if ne .Values.timezone "UTC" }}
+            - --timezone={{ .Values.timezone }}
+            {{- end }}
+            {{- if .Values.dryRun }}
+            - --dry-run=true
+            {{- end }}
+            {{- if ne .Values.interval "1m" }}
+            - --interval={{ .Values.interval }}
+            {{- end }}
+            {{- if ne .Values.defaultProfile "default" }}
+            - --defaultProfile={{ .Values.defaultProfile }}
+            {{- end }}
+            {{- if ne .Values.logLevel "info" }}
+            - --log-level={{ .Values.logLevel }}
+            {{- end }}
+            {{- if ne .Values.listenAddr ":8080" }}
+            - --listen={{ .Values.listenAddr }}
+            {{- end }}
+            {{- if not .Values.dashboard }}
+            - --dashboard=false
+            {{- end }}
+            {{- if .Values.deadManSwitch.enabled }}
+            - --dms-enabled=true
+            - --dms-auto-resume={{ .Values.deadManSwitch.autoResume }}
+            {{- end }}
+            {{- range .Values.args }}
+            - {{ . | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          {{- if or .Values.profiles .Values.extraVolumeMounts }}
+          volumeMounts:
+            {{- if .Values.profiles }}
+            - name: profiles
+              mountPath: /config
+              readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+      {{- if or .Values.profiles .Values.extraVolumes }}
+      volumes:
+        {{- if .Values.profiles }}
+        - name: profiles
+          configMap:
+            name: {{ include "chaosmonkey.fullname" . }}-profiles
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

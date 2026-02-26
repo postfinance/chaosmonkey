@@ -1,0 +1,39 @@
+version: "3"
+
+tasks:
+  default:
+    deps: [run]
+
+  run:
+    desc: "Run chaosmonkey locally"
+    cmds:
+      - go run ./cmd/chaosmonkey {{.CLI_ARGS}}
+
+  build:
+    desc: Build the chaosmonkey binary
+    cmds:
+      - go build -o chaosmonkey ./cmd/chaosmonkey
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./...
+
+  goreleaser:check:
+    desc: Validate goreleaser config
+    cmds:
+      - goreleaser check
+
+  release:preview:
+    desc: Preview the next release version and changelog
+    cmds:
+      - echo "Next version:" && git-cliff --bumped-version
+      - git-cliff --bump --unreleased --strip header
+
+  release:
+    desc: Calculate next version with git-cliff, tag and push
+    preconditions:
+      - sh: git diff --quiet
+        msg: working tree is dirty
+    cmds:
+      - VERSION=$(git-cliff --bumped-version) && echo "Releasing ${VERSION}" && git tag -a "${VERSION}" -m "${VERSION}" && git push origin "${VERSION}"
