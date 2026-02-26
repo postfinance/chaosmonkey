@@ -1,0 +1,17 @@
+default:
+  minAge: 1h
+  maxAge: 600h
+  excludedTimes:
+    - "17:00-08:00"
+  excludedDays:
+    - sat
+    - sun
+  excludedDates:
+    - "2026-12-25"
+    - "2027-01-01"
+  killMode: evict
+
+aggressive:
+  minAge: 1h
+  maxAge: 48h
+  killMode: delete

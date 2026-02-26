@@ -1,0 +1,43 @@
+{{- if .Values.deadManSwitch.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "chaosmonkey.fullname" . }}-dms-canary
+  labels:
+    {{- include "chaosmonkey.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.deadManSwitch.schedule | quote }}
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 60
+      template:
+        metadata:
+          labels:
+            {{- include "chaosmonkey.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: dms-canary
+        spec:
+          serviceAccountName: {{ include "chaosmonkey.serviceAccountName" . }}
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+          containers:
+            - name: renew-lease
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: Always
+              args:
+                - renew-lease
+                - --lease-duration={{ .Values.deadManSwitch.leaseDuration }}
+              resources:
+                {{- toYaml .Values.deadManSwitch.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+{{- end }}

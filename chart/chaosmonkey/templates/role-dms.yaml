@@ -1,0 +1,27 @@
+{{- if .Values.deadManSwitch.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "chaosmonkey.fullname" . }}-dms
+  labels:
+    {{- include "chaosmonkey.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, create, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "chaosmonkey.fullname" . }}-dms
+  labels:
+    {{- include "chaosmonkey.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "chaosmonkey.fullname" . }}-dms
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "chaosmonkey.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

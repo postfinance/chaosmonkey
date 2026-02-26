@@ -1,0 +1,77 @@
+image:
+  repository: linux-docker-staging-local.repo.pnet.ch/stephans/chaosmonkey
+  tag: latest
+  pullPolicy: IfNotPresent
+
+args: []
+
+# Timezone for kill calculations and dashboard display (IANA, e.g. Europe/Zurich)
+timezone: UTC
+
+dryRun: false
+interval: 1m
+defaultProfile: default
+logLevel: info
+listenAddr: ":8080"
+dashboard: true
+
+# Inline profiles YAML. When non-empty, creates a ConfigMap and mounts it.
+# Example:
+#   profiles:
+#     default:
+#       minAge: 1h
+#       maxAge: 14d
+#       killMode: evict  # evict (default), delete, force-delete
+#       excludedTimes:
+#         - "16:00-08:00"
+#       excludedDays:
+#         - sat
+#         - sun
+#     ooo:
+#       minAge: 1h
+#       maxAge: 14d
+#     lazy:
+#       minAge: 8h
+#       maxAge: 14d
+profiles: {}
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 64Mi
+
+tolerations: []
+
+podLabels: {}
+podAnnotations: {}
+
+extraVolumes: []
+extraVolumeMounts: []
+
+httproute:
+  enabled: false
+  hostnames: []
+  parentRef:
+    name: ""
+    namespace: ""
+
+# Dead Man's Switch - auto-suspends evictions when cluster scheduling is broken.
+# Deploys a CronJob that pulls the chaosmonkey image (imagePullPolicy: Always)
+# and renews a Lease. If the Lease expires, chaosmonkey suspends itself.
+deadManSwitch:
+  enabled: false
+  # CronJob schedule for the dead man's switch
+  schedule: "* * * * *"
+  # Lease duration written to the Lease object. DMS suspends after this lease expires.
+  leaseDuration: 120
+  # Auto-resume evictions when the lease is renewed again (default: off)
+  autoResume: false
+  # CronJob resources
+  resources:
+    requests:
+      cpu: 5m
+      memory: 16Mi
+    limits:
+      memory: 32Mi
