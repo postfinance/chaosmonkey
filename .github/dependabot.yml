@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      k8s:
+        patterns:
+          - "k8s.io/*"
+      all-go:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "k8s.io/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: /build
+    schedule:
+      interval: weekly

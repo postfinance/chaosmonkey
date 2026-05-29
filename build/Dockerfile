@@ -1,11 +1,13 @@
 # renovate: datasource=docker packageName=golang
-FROM docker.repo.pnet.ch/golang:1.26 AS build
+ARG GO_VERSION=1.26
+FROM golang:${GO_VERSION} AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ cmd/
 COPY pkg/ pkg/
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /chaosmonkey ./cmd/chaosmonkey
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /chaosmonkey ./cmd/chaosmonkey
 
 FROM scratch
 COPY --from=build /chaosmonkey /chaosmonkey

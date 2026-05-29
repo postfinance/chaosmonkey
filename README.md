@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="monkey.png" alt="Chaos Monkey" width="150">
+</p>
+
 # Chaos Monkey
 
 A Kubernetes chaos tool that kills pods based on configurable profiles. Supports eviction (PDB-aware), delete, and force-delete modes.
@@ -153,9 +157,12 @@ Only application metrics are listed here (prefix `chaosmonkey_`). Go/runtime/pro
 
 ## Helm
 
+The chart is published as an OCI artifact to GHCR:
+
 ```bash
-helm upgrade --install chaosmonkey ./chart/chaosmonkey \
-  --namespace kube-chaosmonkey \
+helm upgrade --install chaosmonkey oci://ghcr.io/postfinance/charts/chaosmonkey \
+  --version 0.1.0 \
+  --namespace kube-chaosmonkey --create-namespace \
   --set httproute.enabled=true \
   --set 'httproute.hostnames[0]=chaosmonkey.example.com' \
   --set httproute.parentRef.name=default \
