@@ -49,14 +49,14 @@ jobs:
           config: cliff.toml
           args: --strip header --tag ${{ github.ref_name }} ${{ steps.prev-tag.outputs.range }}
         env:
-          OUTPUT: CHANGES.md
+          OUTPUT: /tmp/CHANGES.md
           GITHUB_REPO: ${{ github.repository }}
 
       # goreleaser must run against a clean git tree
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean --release-notes=CHANGES.md
+          args: release --clean --release-notes=/tmp/CHANGES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
