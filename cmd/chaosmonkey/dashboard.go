@@ -108,7 +108,7 @@ func (m *Monkey) newDashboardHandler(ctx context.Context) *live.Engine {
 		if s.Connected() {
 			go func() {
 				time.Sleep(1 * time.Second)
-				s.Self(ctx, liveTickEvent, nil)
+				_ = s.Self(ctx, liveTickEvent, nil)
 			}()
 		}
 		return model, nil
@@ -117,7 +117,7 @@ func (m *Monkey) newDashboardHandler(ctx context.Context) *live.Engine {
 	h.HandleSelf(liveTickEvent, func(_ context.Context, s *live.Socket, _ any) (any, error) {
 		go func() {
 			time.Sleep(1 * time.Second)
-			s.Self(ctx, liveTickEvent, nil)
+			_ = s.Self(ctx, liveTickEvent, nil)
 		}()
 		return m.newDashboardModel(), nil
 	})

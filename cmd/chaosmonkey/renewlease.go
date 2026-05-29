@@ -23,7 +23,7 @@ const (
 func runRenewLease() {
 	fs := flag.NewFlagSet("renew-lease", flag.ExitOnError)
 	leaseDurationSec := fs.Int("lease-duration", defaultLeaseDuration, "lease duration in seconds")
-	fs.Parse(os.Args[2:])
+	_ = fs.Parse(os.Args[2:])
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 

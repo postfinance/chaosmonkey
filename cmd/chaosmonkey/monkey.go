@@ -175,7 +175,7 @@ func (m *Monkey) emitSuspendEvent(reason, note string) {
 func (m *Monkey) RegisterAPI(mux *http.ServeMux) {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "ok")
+		_, _ = fmt.Fprintln(w, "ok")
 	})
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
 		metrics.WritePrometheus(w, true)
@@ -191,7 +191,7 @@ func (m *Monkey) handleSuspend() http.HandlerFunc {
 			return
 		}
 		m.Suspend("manual")
-		fmt.Fprintln(w, "suspended")
+		_, _ = fmt.Fprintln(w, "suspended")
 	}
 }
 
@@ -202,7 +202,7 @@ func (m *Monkey) handleResume() http.HandlerFunc {
 			return
 		}
 		m.Resume("manual")
-		fmt.Fprintln(w, "resumed")
+		_, _ = fmt.Fprintln(w, "resumed")
 	}
 }
 
