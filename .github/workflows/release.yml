@@ -32,16 +32,31 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
-      - name: Install git-cliff
-        uses: taiki-e/install-action@v2
+      - name: Compute previous stable tag
+        id: prev-tag
+        run: |
+          CURRENT_TAG="${{ github.ref_name }}"
+          STABLE_TAGS=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V)
+          PREV_TAG=$(echo "$STABLE_TAGS" | grep -B1 "^${CURRENT_TAG}$" | head -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$CURRENT_TAG" ]; then
+            PREV_TAG=$(echo "$STABLE_TAGS" | grep -v "^${CURRENT_TAG}$" | tail -1)
+          fi
+          echo "range=${PREV_TAG}..${CURRENT_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        uses: orhun/git-cliff-action@v4
         with:
-          tool: git-cliff
+          config: cliff.toml
+          args: --strip header --tag ${{ github.ref_name }} ${{ steps.prev-tag.outputs.range }}
+        env:
+          OUTPUT: CHANGES.md
+          GITHUB_REPO: ${{ github.repository }}
 
       # goreleaser must run against a clean git tree
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes=CHANGES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

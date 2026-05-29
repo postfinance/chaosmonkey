@@ -39,6 +39,7 @@ dockers_v2:
       - linux/arm64
 
 changelog:
-  use: git-cliff
+  use: github
+  sort: asc
 
 release: {}
