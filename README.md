@@ -6,6 +6,14 @@
 
 A Kubernetes chaos tool that kills pods based on configurable profiles. Supports eviction (PDB-aware), delete, and force-delete modes.
 
+## Installation
+
+```bash
+helm upgrade --install chaosmonkey oci://ghcr.io/postfinance/charts/chaosmonkey \
+  --namespace kube-chaosmonkey --create-namespace \
+  --set-json 'profiles={"default":{"minAge":"1h","maxAge":"14d"}}'
+```
+
 ## How it works
 
 Chaos Monkey does not naively kill random pods. Instead it pre-calculates a random, detereministic kill time for each pod and kills them when the time comes. The time when pods are allowed to be killed and method of killing is highly configurable through profiles. This ensures:
@@ -106,7 +114,7 @@ deadManSwitch:
 
 ### Events
 
-When the DMS triggers, a `Warning` event with reason `DeadManSwitchTriggered` is emitted. When it auto-resumes, a `DeadManSwitchResumed` event is emitted.
+When evictions are suspended, a `Warning` event with reason `EvictionsSuspended` is emitted. When evictions are resumed, an `EvictionsResumed` event is emitted. These events fire for all suspend/resume actions (DMS, manual, dashboard).
 
 ## Suspend / Resume
 
@@ -124,14 +132,13 @@ While suspended:
 
 * The calc loop continues (schedule is maintained).
 * The kill loop is paused — no pods are killed.
-* A banner is shown on the dashboard.
+* The dashboard state indicator turns red and shows "Suspended".
 
 ## Endpoints
 
 | Path | Method | Description |
 |---|---|---|
-| `/` | GET | Live dashboard with stats, recent kills, upcoming schedule |
-| `/profiles` | GET | Loaded profiles and configuration |
+| `/` | GET | Live dashboard with stats, profiles, recent kills, upcoming schedule |
 | `/metrics` | GET | Prometheus metrics |
 | `/healthz` | GET | Health check |
 | `/suspend` | POST | Suspend evictions |
@@ -154,18 +161,3 @@ Only application metrics are listed here (prefix `chaosmonkey_`). Go/runtime/pro
 | `chaosmonkey_suspended` | Gauge | none | Suspension state: `1` when evictions are suspended, else `0`. |
 | `chaosmonkey_suspensions_total` | Counter | `reason` | Suspend actions by source. Common reasons: `dms`, `dashboard`, `manual`. |
 | `chaosmonkey_upcoming_kills` | Gauge | none | Count of scheduled kills in the next 24h. |
-
-## Helm
-
-The chart is published as an OCI artifact to GHCR:
-
-```bash
-helm upgrade --install chaosmonkey oci://ghcr.io/postfinance/charts/chaosmonkey \
-  --version 0.1.0 \
-  --namespace kube-chaosmonkey --create-namespace \
-  --set httproute.enabled=true \
-  --set 'httproute.hostnames[0]=chaosmonkey.example.com' \
-  --set httproute.parentRef.name=default \
-  --set httproute.parentRef.namespace=kube-istio \
-  --set-json 'profiles={"default":{"minAge":"1h","maxAge":"14d","excludedTimes":["16:00-08:00"],"excludedDays":["sat","sun"]}}'
-```
