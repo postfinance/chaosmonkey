@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2026-05-29
+
+### Bug Fixes
+
+- **chart:** Use appVersion as default image tag ([9c0c356](https://github.com/postfinance/chaosmonkey/commit/9c0c356000e6b0f118ba7fdb1ac7a5780953fb69))
+
 ## [0.1.0] - 2026-05-29
 
 ### CI
