@@ -26,6 +26,11 @@ import (
 const (
 	labelExclusion = "postfinance.ch/chaos-monkey-exclusion"
 	labelProfile   = "postfinance.ch/chaos-monkey-profile"
+
+	// annotationStaticPod is set by the kubelet on mirror pods that represent
+	// static pods. Static pods are managed by the kubelet, not the API server,
+	// so evicting/deleting them has no effect — exclude them.
+	annotationStaticPod = "kubernetes.io/config.hash"
 )
 
 var (
@@ -272,6 +277,14 @@ func (m *Monkey) calcTick(ctx context.Context) {
 			}
 
 			if excludedNS[pod.Namespace] {
+				excluded++
+				metricExcluded.Inc()
+				continue
+			}
+
+			// Static pods (mirror pods) are managed by the kubelet and cannot
+			// be killed via the API server, so skip them.
+			if _, ok := pod.Annotations[annotationStaticPod]; ok {
 				excluded++
 				metricExcluded.Inc()
 				continue
