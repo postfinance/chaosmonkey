@@ -27,6 +27,14 @@ app.kubernetes.io/name: {{ include "chaosmonkey.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "chaosmonkey.port" -}}
+{{- regexFind "[0-9]+$" .Values.listenAddr | int -}}
+{{- end }}
+
 {{- define "chaosmonkey.serviceAccountName" -}}
-{{- include "chaosmonkey.fullname" . }}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "chaosmonkey.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
 {{- end }}

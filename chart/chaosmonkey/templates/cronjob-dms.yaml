@@ -21,6 +21,22 @@ spec:
         spec:
           serviceAccountName: {{ include "chaosmonkey.serviceAccountName" . }}
           restartPolicy: Never
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.topologySpreadConstraints }}
+          topologySpreadConstraints:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           securityContext:
             runAsNonRoot: true
             runAsUser: 65534

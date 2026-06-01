@@ -42,7 +42,21 @@ resources:
   limits:
     memory: 64Mi
 
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+service:
+  annotations: {}
+
 tolerations: []
+nodeSelector: {}
+affinity: {}
+topologySpreadConstraints: []
 
 podLabels: {}
 podAnnotations: {}
@@ -52,10 +66,9 @@ extraVolumeMounts: []
 
 httproute:
   enabled: false
+  annotations: {}
   hostnames: []
-  parentRef:
-    name: ""
-    namespace: ""
+  parentRefs: []
 
 # Dead Man's Switch - auto-suspends evictions when cluster scheduling is broken.
 # Deploys a CronJob that pulls the chaosmonkey image (imagePullPolicy: Always)

@@ -5,14 +5,17 @@ metadata:
   name: {{ include "chaosmonkey.fullname" . }}
   labels:
     {{- include "chaosmonkey.labels" . | nindent 4 }}
+  {{- with .Values.httproute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   parentRefs:
-    - name: {{ .Values.httproute.parentRef.name }}
-      namespace: {{ .Values.httproute.parentRef.namespace }}
+    {{- toYaml .Values.httproute.parentRefs | nindent 4 }}
   hostnames:
     {{- toYaml .Values.httproute.hostnames | nindent 4 }}
   rules:
     - backendRefs:
         - name: {{ include "chaosmonkey.fullname" . }}
-          port: 8080
+          port: {{ include "chaosmonkey.port" . }}
 {{- end }}
