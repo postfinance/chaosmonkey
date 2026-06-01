@@ -83,7 +83,7 @@ Static (mirror) pods are always excluded: they carry the `kubernetes.io/config.h
 
 ### `renew-lease`
 
-Renews the dead man's switch Lease object. Used by the canary CronJob.
+Renews the dead man's switch Lease object. Used by the canary CronJob. See below under "Dead Man's Switch".
 
 ```bash
 chaosmonkey renew-lease [--lease-duration SECONDS]
@@ -98,8 +98,10 @@ chaosmonkey renew-lease [--lease-duration SECONDS]
 The dead man's switch (DMS) is a safety mechanism that automatically suspends evictions when the cluster has scheduling or image-pull problems. During such times, it's probably best to keep pods running. This feature is disabled by default.
 
 1. A **CronJob** (default: every minute) runs the same chaosmonkey image with `imagePullPolicy: Always` and executes the `renew-lease` subcommand. This renews a Kubernetes [Lease](https://kubernetes.io/docs/concepts/architecture/leases/) object.
-2. The chaosmonkey watches the Lease. If the Lease has expired, the DMS triggers and **suspends all evictions**.
-3. Optionally (disabled by default), evictions **auto-resume** once the Lease is renewed again.
+2. On startup chaosmonkey begins **suspended** and only starts killing once it has observed a valid Lease
+3. While running, the chaosmonkey watches the Lease. If it expires, evictions are **suspended**:
+   * with `--dms-auto-resume` **disabled** (the default), evictions stay suspended even if the Lease comes back. A manual call to `/resume` via API or dashboard is required. Or chaosmonkey itself is restarted.
+   * with `--dms-auto-resume` **enabled**, evictions **auto-resume** as soon as the Lease is renewed again.
 
 Because the CronJob uses `imagePullPolicy: Always`, a failure to pull the image (e.g. registry down, node scheduling issues) will prevent the lease renewal, triggering the switch.
 
@@ -131,12 +133,6 @@ curl -X POST http://chaosmonkey:8080/suspend
 curl -X POST http://chaosmonkey:8080/resume
 ```
 
-While suspended:
-
-* The calc loop continues (schedule is maintained).
-* The kill loop is paused — no pods are killed.
-* The dashboard state indicator turns red and shows "Suspended".
-
 ## Endpoints
 
 | Path | Method | Description |
@@ -155,11 +151,8 @@ Only application metrics are listed here (prefix `chaosmonkey_`). Go/runtime/pro
 |---|---|---|---|
 | `chaosmonkey_calc_duration_seconds` | Histogram | none | Duration of each calc tick. |
 | `chaosmonkey_info` | Gauge | `dry_run`, `timezone` | Build/runtime info metric with constant value `1`. |
-| `chaosmonkey_kill_errors_total` | Counter | `reason` | Kill failures. Known reasons: `pdb_blocked`, `error`. |
-| `chaosmonkey_pods_evaluated_total` | Counter | none | Pods evaluated during calc loop. |
-| `chaosmonkey_pods_excluded_total` | Counter | none | Pods skipped from eviction (excluded namespace, or static/mirror pods). |
-| `chaosmonkey_pods_killed_total` | Counter | `profile`, `mode`, `dry_run` | Pods selected for kill action (includes dry-run actions). |
+| `chaosmonkey_pod_kills_total` | Counter | `profile`, `mode`, `dry_run`, `result` | Kill attempt outcomes. `result`: `success`, `pdb_blocked`, `error` (dry-run actions count as `success` with `dry_run="true"`). |
+| `chaosmonkey_pods_evaluated_total` | Counter | `excluded` | Pods observed during the calc loop. `excluded="true"` for opted-out namespaces or static/mirror pods (never killed), `"false"` otherwise. |
 | `chaosmonkey_resumptions_total` | Counter | `reason` | Resume actions by source. Common reasons: `dms`, `dashboard`, `manual`. |
 | `chaosmonkey_suspended` | Gauge | none | Suspension state: `1` when evictions are suspended, else `0`. |
 | `chaosmonkey_suspensions_total` | Counter | `reason` | Suspend actions by source. Common reasons: `dms`, `dashboard`, `manual`. |
-| `chaosmonkey_upcoming_kills` | Gauge | none | Count of scheduled kills in the next 24h. |

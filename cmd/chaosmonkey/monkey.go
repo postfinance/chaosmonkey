@@ -34,8 +34,8 @@ const (
 )
 
 var (
-	metricExcluded     = metrics.NewCounter("chaosmonkey_pods_excluded_total")
-	metricEvaluated    = metrics.NewCounter("chaosmonkey_pods_evaluated_total")
+	metricEvaluated    = metrics.NewCounter(`chaosmonkey_pods_evaluated_total{excluded="false"}`)
+	metricExcluded     = metrics.NewCounter(`chaosmonkey_pods_evaluated_total{excluded="true"}`)
 	metricCalcDuration = metrics.NewHistogram("chaosmonkey_calc_duration_seconds")
 )
 
@@ -72,10 +72,6 @@ func NewMonkey(client kubernetes.Interface, profiles map[string]*profile.KillPro
 		control:        &controlState{},
 		eventLog:       newSuspendEventLog(10),
 	}
-
-	metrics.NewGauge("chaosmonkey_upcoming_kills", func() float64 {
-		return float64(m.sched.upcomingCount(time.Now().Add(24 * time.Hour)))
-	})
 
 	metrics.NewGauge(fmt.Sprintf(`chaosmonkey_info{dry_run="%t",timezone=%q}`, dryRun, loc.String()), func() float64 {
 		return 1
@@ -286,27 +282,22 @@ func (m *Monkey) calcTick(ctx context.Context) {
 		}
 
 		for _, pod := range pods.Items {
-			metricEvaluated.Inc()
-
 			uid := string(pod.UID)
 
 			liveUIDs[uid] = struct{}{}
 
+			// Excluded pods are counted but never killed: an opted-out
+			// namespace, or a static (mirror) pod managed by the kubelet
+			// rather than the API server (so it cannot be evicted).
+			_, isStaticPod := pod.Annotations[annotationStaticPod]
+			if excludedNS[pod.Namespace] || isStaticPod {
+				excluded++
+				metricExcluded.Inc()
+				continue
+			}
+			metricEvaluated.Inc()
+
 			if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
-				continue
-			}
-
-			if excludedNS[pod.Namespace] {
-				excluded++
-				metricExcluded.Inc()
-				continue
-			}
-
-			// Static pods (mirror pods) are managed by the kubelet and cannot
-			// be killed via the API server, so skip them.
-			if _, ok := pod.Annotations[annotationStaticPod]; ok {
-				excluded++
-				metricExcluded.Inc()
 				continue
 			}
 
@@ -411,7 +402,8 @@ func (m *Monkey) killTick(ctx context.Context) {
 
 		if m.dryRun {
 			slog.Info("would kill pod", "pod", podName, "profile", e.Profile, "mode", mode)
-			m.incKillMetric(e.Profile, mode, true)
+			m.totalKilled.Add(1)
+			m.incKillMetric(e.Profile, mode, true, "success")
 			m.sched.markKilled(e.UID, "dry-run")
 			continue
 		}
@@ -423,31 +415,32 @@ func (m *Monkey) killTick(ctx context.Context) {
 				continue
 			}
 			m.totalErrors.Add(1)
+			result := "error"
 			if apierrors.IsTooManyRequests(err) {
-				metrics.GetOrCreateCounter(`chaosmonkey_kill_errors_total{reason="pdb_blocked"}`).Inc()
+				result = "pdb_blocked"
 				slog.Warn("PDB blocked eviction", "pod", podName, "error", err)
 				m.emitEvent(ctx, e, "ChaosMonkeyBlocked",
 					fmt.Sprintf("Eviction blocked by PDB (profile: %s)", e.Profile))
 			} else {
-				metrics.GetOrCreateCounter(`chaosmonkey_kill_errors_total{reason="error"}`).Inc()
 				slog.Error("kill failed", "pod", podName, "error", err)
 			}
+			m.incKillMetric(e.Profile, mode, false, result)
 			m.sched.markKilled(e.UID, "error: "+err.Error())
 			continue
 		}
 
 		age := time.Since(e.CreationTime).Truncate(time.Second)
 		slog.Info("killed pod", "pod", podName, "profile", e.Profile, "mode", mode, "node", e.NodeName, "age", age)
-		m.incKillMetric(e.Profile, mode, false)
+		m.totalKilled.Add(1)
+		m.incKillMetric(e.Profile, mode, false, "success")
 		m.sched.markKilled(e.UID, mode)
 		m.emitEvent(ctx, e, "ChaosMonkeyKilled",
 			fmt.Sprintf("Killed by chaos monkey (profile: %s, mode: %s, age: %s)", e.Profile, mode, age))
 	}
 }
 
-func (m *Monkey) incKillMetric(profileName, mode string, dryRun bool) {
-	m.totalKilled.Add(1)
-	metrics.GetOrCreateCounter(fmt.Sprintf(`chaosmonkey_pods_killed_total{profile=%q,mode=%q,dry_run="%t"}`, profileName, mode, dryRun)).Inc()
+func (m *Monkey) incKillMetric(profileName, mode string, dryRun bool, result string) {
+	metrics.GetOrCreateCounter(fmt.Sprintf(`chaosmonkey_pod_kills_total{profile=%q,mode=%q,dry_run="%t",result=%q}`, profileName, mode, dryRun, result)).Inc()
 }
 
 func (m *Monkey) killPod(ctx context.Context, e *podEntry) error {

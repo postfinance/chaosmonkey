@@ -75,19 +75,6 @@ func (s *schedule) snapshot() (pending []*podEntry, killed []*podEntry) {
 	return
 }
 
-// upcomingCount returns the number of pending entries with KillTime before t.
-func (s *schedule) upcomingCount(t time.Time) int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var n int
-	for _, e := range s.entries {
-		if !e.Killed && e.KillTime.Before(t) {
-			n++
-		}
-	}
-	return n
-}
-
 // overdue returns pending entries whose KillTime <= now.
 func (s *schedule) overdue(now time.Time) []*podEntry {
 	s.mu.Lock()
