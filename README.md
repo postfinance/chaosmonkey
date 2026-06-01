@@ -62,6 +62,8 @@ aggressive:
 
 You can exclude namespaces from chaos-monkey with a `postfinance.ch/chaos-monkey-exclusion=true` label.
 
+Static (mirror) pods are always excluded: they carry the `kubernetes.io/config.hash` annotation and are managed by the kubelet rather than the API server, so they cannot be evicted.
+
 ## Flags
 
 | Flag | Default | Description |
@@ -152,11 +154,10 @@ Only application metrics are listed here (prefix `chaosmonkey_`). Go/runtime/pro
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `chaosmonkey_calc_duration_seconds` | Histogram | none | Duration of each calc tick. |
-| `chaosmonkey_dms_expired` | Gauge | none | Dead man's switch state: `1` when lease is expired, else `0`. |
 | `chaosmonkey_info` | Gauge | `dry_run`, `timezone` | Build/runtime info metric with constant value `1`. |
 | `chaosmonkey_kill_errors_total` | Counter | `reason` | Kill failures. Known reasons: `pdb_blocked`, `error`. |
 | `chaosmonkey_pods_evaluated_total` | Counter | none | Pods evaluated during calc loop. |
-| `chaosmonkey_pods_excluded_total` | Counter | none | Pods skipped due to namespace exclusion label. |
+| `chaosmonkey_pods_excluded_total` | Counter | none | Pods skipped from eviction (excluded namespace, or static/mirror pods). |
 | `chaosmonkey_pods_killed_total` | Counter | `profile`, `mode`, `dry_run` | Pods selected for kill action (includes dry-run actions). |
 | `chaosmonkey_resumptions_total` | Counter | `reason` | Resume actions by source. Common reasons: `dms`, `dashboard`, `manual`. |
 | `chaosmonkey_suspended` | Gauge | none | Suspension state: `1` when evictions are suspended, else `0`. |

@@ -22,23 +22,23 @@ func (m *Monkey) RegisterDashboard(mux *http.ServeMux, ctx context.Context) {
 
 // dashboardModel is the live view model.
 type dashboardModel struct {
-	TotalEvicted  int
-	TotalErrors   int
-	Uptime        string
-	Timezone      string
-	Now           time.Time
-	DryRun        bool
-	Suspended     bool
-	SuspendSince  string
-	SuspendReason string
-	Upcoming      []*podEntry
-	Recent        []*podEntry
-	Profiles      []profileView
-	SuspendEvents []suspendEvent
+	TotalEvicted   int
+	TotalErrors    int
+	Uptime         string
+	Timezone       string
+	Now            time.Time
+	DryRun         bool
+	Suspended      bool
+	StateLabel     string
+	ResumeDisabled bool
+	SuspendSince   string
+	Upcoming       []*podEntry
+	Recent         []*podEntry
+	Profiles       []profileView
+	SuspendEvents  []suspendEvent
 
 	// Dead man's switch
 	DMSEnabled    bool
-	DMSExpired    bool
 	DMSAutoResume bool
 	DMSLeaseValue string
 	DMSLeaseTitle string
@@ -55,34 +55,33 @@ func (m *Monkey) newDashboardModel() *dashboardModel {
 		recent = recent[:10]
 	}
 
-	suspended, reason, since := m.suspend.status()
-	suspendReason := "-"
+	state, since := m.control.status()
+	suspended := state != stateRunning
 	suspendSince := "-"
 	if suspended {
-		suspendReason = reason
 		suspendSince = since.In(m.location).Format("2006-01-02 15:04:05")
 	}
 
 	model := &dashboardModel{
-		TotalEvicted:  int(m.totalKilled.Load()),
-		TotalErrors:   int(m.totalErrors.Load()),
-		Uptime:        now.Sub(m.startTime).Truncate(time.Second).String(),
-		Timezone:      m.location.String(),
-		Now:           now,
-		DryRun:        m.dryRun,
-		Suspended:     suspended,
-		SuspendSince:  suspendSince,
-		SuspendReason: suspendReason,
-		Upcoming:      upcoming,
-		Recent:        recent,
-		Profiles:      m.newProfilesModel(),
-		SuspendEvents: m.eventLog.snapshot(),
+		TotalEvicted:   int(m.totalKilled.Load()),
+		TotalErrors:    int(m.totalErrors.Load()),
+		Uptime:         now.Sub(m.startTime).Truncate(time.Second).String(),
+		Timezone:       m.location.String(),
+		Now:            now,
+		DryRun:         m.dryRun,
+		Suspended:      suspended,
+		StateLabel:     state.Label(),
+		ResumeDisabled: state == stateWaitingForLease,
+		SuspendSince:   suspendSince,
+		Upcoming:       upcoming,
+		Recent:         recent,
+		Profiles:       m.newProfilesModel(),
+		SuspendEvents:  m.eventLog.snapshot(),
 	}
 
 	if m.dms != nil {
-		enabled, expired, lastRenew, expiresAt, _ := m.dms.Status()
-		model.DMSEnabled = enabled
-		model.DMSExpired = expired
+		lastRenew, expiresAt := m.dms.Status()
+		model.DMSEnabled = true
 		model.DMSAutoResume = m.dms.AutoResume()
 		if !expiresAt.IsZero() {
 			remaining := expiresAt.Sub(now).Truncate(time.Second)
@@ -125,10 +124,12 @@ func (m *Monkey) newDashboardHandler(ctx context.Context) *live.Engine {
 	})
 
 	h.HandleEvent("toggle-suspend", func(_ context.Context, _ *live.Socket, _ live.Params) (any, error) {
-		if m.suspend.isSuspended() {
-			m.Resume("manual (dashboard)")
-		} else {
+		switch m.control.current() {
+		case stateRunning:
 			m.Suspend("manual (dashboard)")
+		case stateManualResumeRequired:
+			m.Resume("manual (dashboard)")
+			// stateWaitingForLease: no manual override; wait for the lease.
 		}
 		return m.newDashboardModel(), nil
 	})
@@ -229,6 +230,7 @@ var cssStyle = `
   .card-state .info { font-size: .7rem; color: #888; }
   .toggle { padding: .3rem .75rem; border: none; border-radius: 5px; font-size: .7rem; font-weight: 600; cursor: pointer; white-space: nowrap; background: #ddd; color: #333; }
   .toggle:hover { background: #ccc; }
+  .toggle:disabled { background: #eee; color: #aaa; cursor: not-allowed; }
   .val-ok { color: #2ecc71; }
   .val-warn { color: #e67e22; }
   .val-bad { color: #e74c3c; }
@@ -266,14 +268,13 @@ var dashboardTmpl = template.Must(template.New("root").Funcs(template.FuncMap{
     <div class="card-state">
       <div class="left">
         <div class="dot {{if .Assigns.Suspended}}suspended{{else}}running{{end}}"></div>
-        <div class="value" style="margin:0">{{if .Assigns.Suspended}}Suspended{{else}}Running{{end}}</div>
+        <div class="value" style="margin:0">{{.Assigns.StateLabel}}</div>
       </div>
-      <button class="toggle" live-click="toggle-suspend">{{if .Assigns.Suspended}}Resume{{else}}Suspend{{end}}</button>
+      <button class="toggle" live-click="toggle-suspend"{{if .Assigns.ResumeDisabled}} disabled{{end}}>{{if .Assigns.Suspended}}Resume{{else}}Suspend{{end}}</button>
     </div>
   </div>
   <div class="card card-wide"><div class="label">Suspended Since</div><div class="value">{{.Assigns.SuspendSince}}</div></div>
-  <div class="card"><div class="label">Suspend Reason</div><div class="value">{{.Assigns.SuspendReason}}</div></div>
-  <div class="card"><div class="label">Mode</div><div class="value {{if .Assigns.DryRun}}val-warn{{end}}">{{if .Assigns.DryRun}}Dry Run{{else}}Live{{end}}</div></div>
+  <div class="card"><div class="label">Dry Run</div><div class="value {{if .Assigns.DryRun}}val-warn{{end}}">{{if .Assigns.DryRun}}On{{else}}Off{{end}}</div></div>
   <div class="card"><div class="label">Evicted</div><div class="value">{{.Assigns.TotalEvicted}}</div></div>
   <div class="card"><div class="label">Errors</div><div class="value">{{.Assigns.TotalErrors}}</div></div>
   <div class="card"><div class="label">Profiles</div><div class="value">{{len .Assigns.Profiles}}</div></div>

@@ -50,7 +50,7 @@ type Monkey struct {
 	location       *time.Location
 
 	sched    *schedule
-	suspend  *suspendState
+	control  *controlState
 	dms      *DeadManSwitch
 	eventLog *suspendEventLog
 
@@ -69,7 +69,7 @@ func NewMonkey(client kubernetes.Interface, profiles map[string]*profile.KillPro
 		startTime:      time.Now(),
 		location:       loc,
 		sched:          newSchedule(),
-		suspend:        &suspendState{},
+		control:        &controlState{},
 		eventLog:       newSuspendEventLog(10),
 	}
 
@@ -82,7 +82,7 @@ func NewMonkey(client kubernetes.Interface, profiles map[string]*profile.KillPro
 	})
 
 	metrics.NewGauge("chaosmonkey_suspended", func() float64 {
-		if m.suspend.isSuspended() {
+		if m.control.isSuspended() {
 			return 1
 		}
 		return 0
@@ -91,29 +91,57 @@ func NewMonkey(client kubernetes.Interface, profiles map[string]*profile.KillPro
 	return m
 }
 
-// Suspend suspends evictions with the given reason.
+// Suspend suspends evictions manually (e.g. via the /suspend endpoint). This
+// always moves to MANUAL_RESUME_REQUIRED — only a human /resume clears it.
 func (m *Monkey) Suspend(reason string) {
-	if m.suspend.suspend(reason) {
-		metrics.GetOrCreateCounter(fmt.Sprintf(`chaosmonkey_suspensions_total{reason=%q}`, metricReason(reason))).Inc()
-		m.eventLog.add("suspended", reason)
-		m.emitSuspendEvent("EvictionsSuspended", fmt.Sprintf("Evictions suspended: %s", reason))
+	if from, to, changed := m.control.manualSuspend(); changed {
+		m.emitTransition(from, to, reason)
 	}
 }
 
-// Resume resumes evictions.
+// Resume resumes evictions manually (e.g. via the /resume endpoint).
 func (m *Monkey) Resume(reason string) {
-	if m.suspend.resume() {
+	if from, to, changed := m.control.manualResume(); changed {
+		m.emitTransition(from, to, reason)
+	}
+}
+
+// onLeaseValid is called by the dead man's switch on a healthy lease.
+func (m *Monkey) onLeaseValid() {
+	if from, to, changed := m.control.onLeaseValid(); changed {
+		m.emitTransition(from, to, "dead man's switch")
+	}
+}
+
+// onLeaseExpired is called by the dead man's switch on an expired/missing lease.
+func (m *Monkey) onLeaseExpired() {
+	if from, to, changed := m.control.onLeaseExpired(); changed {
+		m.emitTransition(from, to, "dead man's switch")
+	}
+}
+
+// emitTransition records metrics, the in-memory event log and a Kubernetes
+// Event for a real state change.
+func (m *Monkey) emitTransition(from, to controlStateValue, reason string) {
+	if to == stateRunning {
+		slog.Info("evictions resumed", "reason", reason, "from", from.String())
 		metrics.GetOrCreateCounter(fmt.Sprintf(`chaosmonkey_resumptions_total{reason=%q}`, metricReason(reason))).Inc()
 		m.eventLog.add("resumed", reason)
 		m.emitSuspendEvent("EvictionsResumed", fmt.Sprintf("Evictions resumed: %s", reason))
+		return
 	}
+	slog.Warn("evictions suspended", "reason", reason, "state", to.String())
+	metrics.GetOrCreateCounter(fmt.Sprintf(`chaosmonkey_suspensions_total{reason=%q}`, metricReason(reason))).Inc()
+	m.eventLog.add("suspended", reason)
+	m.emitSuspendEvent("EvictionsSuspended", fmt.Sprintf("Evictions suspended: %s (%s)", reason, to))
 }
 
-// SetDeadManSwitch configures the dead man's switch.
-// Immediately suspends evictions until the lease is verified.
+// SetDeadManSwitch configures the dead man's switch. Evictions start suspended
+// in WAITING_FOR_LEASE until the canary proves the lease is fresh.
 func (m *Monkey) SetDeadManSwitch(dms *DeadManSwitch) {
 	m.dms = dms
-	m.Suspend("dead man's switch")
+	m.control.init(stateWaitingForLease, dms.autoResume)
+	slog.Info("dead man's switch enabled, waiting for valid lease", "auto_resume", dms.autoResume)
 }
 
 // Start runs the calc and kill loops, blocking until ctx is cancelled.
@@ -132,18 +160,10 @@ func (m *Monkey) Start(ctx context.Context) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			m.dms.watchLoop(ctx, m.onDMSExpire, m.onDMSResume)
+			m.dms.watchLoop(ctx, m.onLeaseValid, m.onLeaseExpired)
 		}()
 	}
 	wg.Wait()
-}
-
-func (m *Monkey) onDMSExpire() {
-	m.Suspend("dead man's switch")
-}
-
-func (m *Monkey) onDMSResume() {
-	m.Resume("dead man's switch")
 }
 
 func (m *Monkey) emitSuspendEvent(reason, note string) {
@@ -357,7 +377,7 @@ func (m *Monkey) calcTick(ctx context.Context) {
 		}
 	}
 
-	m.sched.reconcile(liveUIDs, newEntries, m.suspend.isSuspended(), m.profiles, m.location)
+	m.sched.reconcile(liveUIDs, newEntries, m.control.isSuspended(), m.profiles, m.location)
 	slog.Info("calc tick", "excluded", excluded, "new", len(newEntries), "liveUIDs", len(liveUIDs))
 }
 
@@ -371,7 +391,7 @@ func (m *Monkey) killLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if m.suspend.isSuspended() {
+			if m.control.isSuspended() {
 				continue
 			}
 			m.killTick(ctx)
