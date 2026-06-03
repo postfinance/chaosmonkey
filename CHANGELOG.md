@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-06-03
+
+### Bug Fixes
+
+- Keep all upcoming pods in memory ([ad467e3](https://github.com/postfinance/chaosmonkey/commit/ad467e38a15e767e159294604fee3a7ead909172))
+
 ## [0.2.0] - 2026-06-01
 
 ### Bug Fixes
