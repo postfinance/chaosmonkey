@@ -33,6 +33,7 @@ type dashboardModel struct {
 	ResumeDisabled bool
 	SuspendSince   string
 	Upcoming       []*podEntry
+	UpcomingTotal  int
 	Recent         []*podEntry
 	Profiles       []profileView
 	SuspendEvents  []suspendEvent
@@ -48,6 +49,7 @@ type dashboardModel struct {
 func (m *Monkey) newDashboardModel() *dashboardModel {
 	now := time.Now().In(m.location)
 	upcoming, recent := m.sched.snapshot()
+	upcomingTotal := len(upcoming)
 	if len(upcoming) > 10 {
 		upcoming = upcoming[:10]
 	}
@@ -74,6 +76,7 @@ func (m *Monkey) newDashboardModel() *dashboardModel {
 		ResumeDisabled: state == stateWaitingForLease,
 		SuspendSince:   suspendSince,
 		Upcoming:       upcoming,
+		UpcomingTotal:  upcomingTotal,
 		Recent:         recent,
 		Profiles:       m.newProfilesModel(),
 		SuspendEvents:  m.eventLog.snapshot(),
@@ -323,7 +326,7 @@ var dashboardTmpl = template.Must(template.New("root").Funcs(template.FuncMap{
 </div>
 
 <div class="section">
-<h2>Upcoming Kills</h2>
+<h2>Upcoming Kills{{if gt .Assigns.UpcomingTotal 10}} <span class="note" style="font-weight:normal">(next 10 of {{.Assigns.UpcomingTotal}})</span>{{end}}</h2>
 {{if .Assigns.Upcoming}}
 <table>
 <tr><th>Namespace</th><th>Pod</th><th>Profile</th><th>Mode</th><th>Kill Time</th><th>Countdown</th></tr>

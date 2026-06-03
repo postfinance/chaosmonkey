@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	maxUpcoming    = 100
 	maxRecentKills = 20
 )
 
@@ -115,7 +114,6 @@ func (s *schedule) remove(uid string) {
 //  3. During suspend: reschedule overdue pending entries into the future
 //     using now as creation time, so the window starts at now+minAge.
 //  4. Trim killed entries to maxRecentKills (keep newest).
-//  5. Trim pending entries to maxUpcoming (keep soonest).
 func (s *schedule) reconcile(liveUIDs map[string]struct{}, newEntries []*podEntry, suspended bool, profiles map[string]*profile.KillProfile, loc *time.Location) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -175,22 +173,6 @@ func (s *schedule) reconcile(liveUIDs map[string]struct{}, newEntries []*podEntr
 		})
 		for i := range len(killedEntries) - maxRecentKills {
 			delete(s.entries, killedEntries[i].UID)
-		}
-	}
-
-	// 5. Trim pending entries to cap (keep soonest kill times).
-	var pendingEntries []*podEntry
-	for _, e := range s.entries {
-		if !e.Killed {
-			pendingEntries = append(pendingEntries, e)
-		}
-	}
-	if len(pendingEntries) > maxUpcoming {
-		sort.Slice(pendingEntries, func(i, j int) bool {
-			return pendingEntries[i].KillTime.Before(pendingEntries[j].KillTime)
-		})
-		for i := maxUpcoming; i < len(pendingEntries); i++ {
-			delete(s.entries, pendingEntries[i].UID)
 		}
 	}
 }
