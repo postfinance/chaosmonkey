@@ -6,9 +6,9 @@ require (
 	github.com/VictoriaMetrics/metrics v1.43.2
 	github.com/jfyne/live v0.16.3
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
-	k8s.io/api v0.36.1
-	k8s.io/apimachinery v0.36.1
-	k8s.io/client-go v0.36.1
+	k8s.io/api v0.36.2
+	k8s.io/apimachinery v0.36.2
+	k8s.io/client-go v0.36.2
 )
 
 require (
