@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-08-24
+
+### Miscellaneous
+
+- **deps:** Bump the all-go group across 1 directory with 2 updates ([e0cb8fa](https://github.com/postfinance/chaosmonkey/commit/e0cb8fa17910316058fa3f375df09efd20d127a5))
+- **deps:** Bump the actions group across 1 directory with 3 updates ([c630061](https://github.com/postfinance/chaosmonkey/commit/c630061b94390507a26546f4c318eda3a7702652))
+- **deps:** Bump the k8s group with 3 updates ([6f8b3ec](https://github.com/postfinance/chaosmonkey/commit/6f8b3ec4d045401e8c450ef907b1ebee959432dd))
+
 ## [0.2.1] - 2026-06-03
 
 ### Bug Fixes
