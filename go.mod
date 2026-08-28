@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/VictoriaMetrics/metrics v1.44.0
 	github.com/jfyne/live v0.16.3
-	go.yaml.in/yaml/v4 v4.0.0-rc.5
+	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
 	k8s.io/client-go v0.36.2
