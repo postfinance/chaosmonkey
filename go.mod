@@ -3,12 +3,12 @@ module github.com/postfinance/chaosmonkey
 go 1.26.0
 
 require (
-	github.com/VictoriaMetrics/metrics v1.44.0
+	github.com/VictoriaMetrics/metrics v1.44.1
 	github.com/jfyne/live v0.16.3
-	go.yaml.in/yaml/v4 v4.0.0-rc.5
-	k8s.io/api v0.37.0
-	k8s.io/apimachinery v0.37.0
-	k8s.io/client-go v0.37.0
+	go.yaml.in/yaml/v4 v4.0.0
+	k8s.io/api v0.37.2
+	k8s.io/apimachinery v0.37.2
+	k8s.io/client-go v0.37.2
 )
 
 require (
