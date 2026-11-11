@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-11-11
+
+### Miscellaneous
+
+- **deps:** Bump the k8s group across 1 directory with 2 updates ([e6ae3f0](https://github.com/postfinance/chaosmonkey/commit/e6ae3f043435bb7f88d0afbc04faaab0632fdd8e))
+- **deps:** Bump dependencies ([c7856b6](https://github.com/postfinance/chaosmonkey/commit/c7856b6bd852129246e41d22d30ce10dd4dff39a))
+
 ## [0.2.2] - 2026-08-24
 
 ### Miscellaneous
